@@ -19,6 +19,9 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Routes
+app.get("/", (req, res) => {
+  res.send("Server is running 🚀");
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/users", userRoutes);
