@@ -15,7 +15,13 @@ const orderRoutes = require("./routes/orderRoutes"); // Import order routes
 const wishlistRoutes = require("./routes/wishlistRoutes");
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://inventify-project.vercel.app"],
+    credentials: true,
+  })
+);
+
 app.use(bodyParser.json());
 
 // Routes
