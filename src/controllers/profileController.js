@@ -4,19 +4,29 @@ const bcrypt = require("bcrypt");
 // Get User Profile
 exports.getProfile = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
     const user = await User.findById(req.user.id).select(
       "-passwordHash -twoFactorSecret"
     );
-    if (!user) return res.status(404).json({ error: "User not found." });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     res.json(user);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error fetching profile." });
+    console.error("Profile fetch error:", error);
+    res.status(500).json({
+      error: "Server error fetching profile",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 // Get User Profile
-
-
 
 exports.updateProfile = async (req, res) => {
   const { name, phoneNumber, country, city, state, postalCode } = req.body;

@@ -141,7 +141,6 @@ exports.getCharts = async (req, res) => {
 
 // Fetch Recent Activity
 
-
 exports.getTopProdcuts = async (req, res) => {
   const { period } = req.query; // 'daily', 'weekly', 'monthly'
 
@@ -155,23 +154,36 @@ exports.getTopProdcuts = async (req, res) => {
     // Define date range based on the period
     const now = new Date();
     let startDate;
+
+    // Create a new Date object to avoid modifying the original
+    const currentDate = new Date(now);
+
     if (period === "daily") {
-      // Start of today
-      startDate = new Date(now.setHours(0, 0, 0, 0));
+      startDate = new Date(currentDate.setHours(0, 0, 0, 0));
     } else if (period === "weekly") {
-      // Start of the last 7 days
-      startDate = new Date(now.setDate(now.getDate() - 6));
-      startDate.setHours(0, 0, 0, 0); // Reset to midnight
+      startDate = new Date(currentDate.setDate(currentDate.getDate() - 6));
+      startDate.setHours(0, 0, 0, 0);
     } else if (period === "monthly") {
-      // Start of the current month
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1
+      );
     }
 
-    // Fetch and aggregate data
-    const productPerformance = await Order.aggregate([
-      // Filter orders created after startDate
-      { $match: { createdAt: { $gte: startDate } } },
-      { $unwind: "$orderItems" }, // Break orderItems into individual docs
+    console.log("Period:", period);
+    console.log("Start Date:", startDate);
+    console.log("Current Date:", now);
+
+    // First try to get products from the specified period
+    let productPerformance = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate },
+          status: "delivered", // Only count delivered orders
+        },
+      },
+      { $unwind: "$orderItems" },
       {
         $group: {
           _id: "$orderItems.productId",
@@ -186,14 +198,14 @@ exports.getTopProdcuts = async (req, res) => {
           as: "productDetails",
         },
       },
-      { $unwind: "$productDetails" }, // Extract product details
+      { $unwind: "$productDetails" },
       {
         $project: {
           productName: "$productDetails.name",
           totalSold: 1,
         },
       },
-      { $sort: { totalSold: -1 } }, // Sort by most sold
+      { $sort: { totalSold: -1 } },
       {
         $group: {
           _id: null,
@@ -204,13 +216,68 @@ exports.getTopProdcuts = async (req, res) => {
       },
     ]);
 
+    console.log("Period Results:", productPerformance);
+
+    // If no products found in the specified period, get all-time data
+    if (!productPerformance.length || !productPerformance[0].products.length) {
+      console.log("No products found in period, fetching all-time data");
+      productPerformance = await Order.aggregate([
+        {
+          $match: {
+            status: "delivered", // Only count delivered orders
+          },
+        },
+        { $unwind: "$orderItems" },
+        {
+          $group: {
+            _id: "$orderItems.productId",
+            totalSold: { $sum: "$orderItems.quantity" },
+          },
+        },
+        {
+          $lookup: {
+            from: "products",
+            localField: "_id",
+            foreignField: "_id",
+            as: "productDetails",
+          },
+        },
+        { $unwind: "$productDetails" },
+        {
+          $project: {
+            productName: "$productDetails.name",
+            totalSold: 1,
+          },
+        },
+        { $sort: { totalSold: -1 } },
+        {
+          $group: {
+            _id: null,
+            products: {
+              $push: { productName: "$productName", totalSold: "$totalSold" },
+            },
+          },
+        },
+      ]);
+      console.log("All-time Results:", productPerformance);
+    }
+
+    // Ensure we always return an array, even if empty
+    const products =
+      productPerformance.length > 0 ? productPerformance[0].products : [];
+
     res.status(200).json({
-      data: productPerformance.length > 0 ? productPerformance[0].products : [],
+      data: products,
+      period: period,
+      startDate: startDate,
+      isAllTime:
+        !productPerformance.length || !productPerformance[0].products.length,
     });
   } catch (error) {
     console.error("Error fetching product performance:", error);
     res.status(500).json({
       message: "Server error while fetching product performance",
+      error: error.message,
     });
   }
 };

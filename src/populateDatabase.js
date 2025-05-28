@@ -10,24 +10,15 @@ const seedCarts = require("./seeders/cartSeeder");
 const seedWishlists = require("./seeders/wishlistSeeder");
 const seedReviews = require("./seeders/reviewSeeder");
 const seedNotifications = require("./seeders/notificationSeeder");
+const seedSales = require("./seeders/salesSeeder");
 
 require("dotenv").config();
 const MONGODB_URI = process.env.DB_CONNECTION_STRING;
-
-const clearCollections = async () => {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany();
-  }
-  console.log("All collections cleared");
-};
 
 const seedDatabase = async () => {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("Connected to MongoDB");
-
-    await clearCollections();
 
     const categories = await seedCategories();
     const users = await seedUsers();
@@ -41,6 +32,7 @@ const seedDatabase = async () => {
       seedWishlists(users, products),
       seedReviews(users, products),
       seedNotifications(users),
+      seedSales(),
     ]);
 
     console.log("Database seeding completed successfully!");
