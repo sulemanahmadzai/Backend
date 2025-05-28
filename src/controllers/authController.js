@@ -66,37 +66,55 @@ exports.googleLogin = async (req, res) => {
   }
 
   try {
+    // Verify Google Token
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    console.log(ticket);
-    const { sub, email, name, picture } = ticket.getPayload(); // Extract data from payload
+
+    const { sub, email, name, picture } = ticket.getPayload();
 
     // Check if user exists in database
-    let user = await User.findOne({ googleId: sub });
+    let user = await User.findOne({ email });
 
     if (!user) {
       // If user doesn't exist, create a new one
       user = new User({
-        googleId: sub,
         email,
         name,
         picture,
+        googleId: sub,
+        role: "customer",
+        createdAt: new Date(),
+        passwordHash: "", // No password for Google accounts
       });
       await user.save();
     }
 
-    // Generate a JWT for the user (You need to implement the `generateJwt` function)
-    const jwtToken = generateJwt({ id: user._id, email: user.email });
+    // Generate JWT token
+    const jwtToken = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
     // Send the token to the frontend
-    res
-      .status(200)
-      .json({ token: jwtToken, message: "Google login successful!" });
+    res.status(200).json({
+      token: jwtToken,
+      message: "Google login successful!",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (error) {
     console.error("Error during Google login:", error);
-    res.status(500).json({ message: "Google login failed. Please try again." });
+    res.status(500).json({
+      message: "Google login failed. Please try again.",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 

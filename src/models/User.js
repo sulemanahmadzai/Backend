@@ -20,12 +20,13 @@ const UserSchema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: false },
+    googleId: { type: String, sparse: true },
+    picture: { type: String },
     role: {
       type: String,
       enum: ["customer", "manager", "admin"],
-      default: "admin",
+      default: "customer",
     },
-
     personalDetails: PersonalDetailsSchema,
     paymentMethods: [PaymentMethodSchema],
     accountStatus: {
